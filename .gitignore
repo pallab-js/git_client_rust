@@ -27,3 +27,6 @@ src-tauri/gen/schemas/
 coverage/
 playwright-report/
 test-results/
+
+# Graphify
+graphify-out/
