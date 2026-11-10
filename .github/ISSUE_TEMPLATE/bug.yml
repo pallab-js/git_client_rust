@@ -1,0 +1,81 @@
+name: Bug report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of what the bug is.
+      placeholder: When I click the tray icon on macOS, the popover doesn't appear...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Start GitPulse
+        2. Add a repository
+        3. Make a change in the repo
+        4. Observe the tray/popover
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What you expected to happen.
+      placeholder: The popover should show the repository with the changed file...
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: What actually happened.
+      placeholder: The popover stays empty or doesn't open...
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - macOS (specify version)
+        - Windows 10/11
+        - Linux (specify distribution)
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: GitPulse version
+      description: The version of GitPulse you're running (check About in Settings)
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / error messages
+      description: Any relevant log output from the app (Settings → Data & history → Export diagnostics, or check the log file in app data)
+      render: text
+    validations:
+      required: false
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues to avoid duplicates
+          required: true
+        - label: I am running the latest version
+          required: true

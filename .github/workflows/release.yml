@@ -1,0 +1,150 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  version-sync:
+    name: Version sync guard
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check version sync
+        id: version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION=$(grep '"version":' package.json | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+          CARGO_VERSION=$(grep '^version =' src-tauri/Cargo.toml | head -1 | sed 's/.*= *"\([^"]*\)".*/\1/')
+          TAURI_VERSION=$(grep '"version":' src-tauri/tauri.conf.json | head -1 | sed 's/.*"version": *"\([^"]*\)".*/\1/')
+          
+          echo "Tag: $TAG"
+          echo "package.json: $PACKAGE_VERSION"
+          echo "Cargo.toml: $CARGO_VERSION"
+          echo "tauri.conf.json: $TAURI_VERSION"
+          
+          if [[ "$TAG" != "$PACKAGE_VERSION" || "$TAG" != "$CARGO_VERSION" || "$TAG" != "$TAURI_VERSION" ]]; then
+            echo "Version mismatch! Tag: $TAG, package.json: $PACKAGE_VERSION, Cargo.toml: $CARGO_VERSION, tauri.conf.json: $TAURI_VERSION"
+            exit 1
+          fi
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+
+  release:
+    name: Build and release on ${{ matrix.os }}
+    needs: version-sync
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: universal-apple-darwin
+            artifact: gitpulse.dmg
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: gitpulse.AppImage
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: gitpulse.deb
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            artifact: gitpulse.x86_64.nsis.exe
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew list cmake &>/dev/null || brew install cmake
+      - run: pnpm install --frozen-lockfile
+      - name: Build
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'GitPulse v__VERSION__'
+          releaseBody: 'See CHANGELOG.md for details.'
+          releaseDraft: true
+          prerelease: false
+          args: --target ${{ matrix.target }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: src-tauri/target/release/bundle/**/${{ matrix.artifact }}
+
+  checksums:
+    name: Generate checksums
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Generate SHA256SUMS
+        run: |
+          cd artifacts
+          find . -type f -name "gitpulse*" ! -name "*.sha256" ! -name "SHA256SUMS.txt" | sort | xargs sha256sum > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+      - name: Upload checksums
+        uses: actions/upload-artifact@v4
+        with:
+          name: SHA256SUMS
+          path: artifacts/SHA256SUMS.txt
+
+  publish:
+    name: Publish release
+    needs: [release, checksums]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Find draft release
+        id: release
+        uses: octokit/request-action@v2.x
+        with:
+          route: GET /repos/{repo}/releases
+          repo: ${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload assets to release
+        run: |
+          RELEASE_ID=$(echo '${{ steps.release.outputs.data }}' | jq -r '.[] | select(.draft == true and .tag_name == "${{ github.ref_name }}") | .id')
+          for file in artifacts/**/*; do
+            if [[ -f "$file" && "$file" != *SHA256SUMS.txt ]]; then
+              gh release upload "${{ github.ref_name }}" "$file" --repo ${{ github.repository }} --clobber
+            fi
+          done
+          gh release upload "${{ github.ref_name }}" artifacts/SHA256SUMS.txt --repo ${{ github.repository }} --clobber
+          gh release edit "${{ github.ref_name }}" --draft=false --repo ${{ github.repository }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

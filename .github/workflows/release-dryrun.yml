@@ -1,0 +1,71 @@
+name: Release Dry-run
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to test (e.g., 0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  dryrun:
+    name: Dry-run on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            target: universal-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ runner.os }}-cargo-${{ hashFiles('src-tauri/Cargo.lock') }}
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew list cmake &>/dev/null || brew install cmake
+      - run: pnpm install --frozen-lockfile
+      - name: Build
+        uses: tauri-apps/tauri-action@v0
+        with:
+          tagName: v${{ github.event.inputs.version }}-dryrun
+          releaseName: 'GitPulse ${{ github.event.inputs.version }} (dry-run)'
+          releaseBody: 'Dry-run build for testing.'
+          releaseDraft: true
+          prerelease: true
+          args: --target ${{ matrix.target }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: gitpulse-${{ matrix.os }}-${{ github.event.inputs.version }}
+          path: src-tauri/target/release/bundle/
+          retention-days: 7
