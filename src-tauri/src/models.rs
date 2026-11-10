@@ -355,7 +355,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: Theme::System,
-            start_minimized: true,
+            start_minimized: false,
             launch_at_login: false,
             show_dock_icon: ShowDockIcon::WhenWindowOpen,
             keep_popover_warm: true,
