@@ -53,7 +53,7 @@ jobs:
           brew list cmake &>/dev/null || brew install cmake
       - run: pnpm install --frozen-lockfile
       - name: Build
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         with:
           tagName: v${{ github.event.inputs.version }}-dryrun
           releaseName: 'GitPulse ${{ github.event.inputs.version }} (dry-run)'
