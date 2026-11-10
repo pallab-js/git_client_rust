@@ -147,3 +147,15 @@ jobs:
           cargo install cargo-deny --locked
           cargo deny check
         working-directory: src-tauri
+
+  checks:
+    name: All checks passed
+    runs-on: ubuntu-latest
+    needs: [frontend, playwright, rust, tauri-smoke, supply-chain]
+    if: always()
+    steps:
+      - name: Check all jobs succeeded
+        run: |
+          echo "All required checks passed!"
+          # This job succeeds if all needed jobs succeeded
+          # If any needed job failed, this job will be skipped due to 'if: always()' + needs
