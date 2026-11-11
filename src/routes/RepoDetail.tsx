@@ -10,7 +10,6 @@ import {
   Trash2,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 
 import type {
   ActivityEntry,
@@ -22,6 +21,7 @@ import type {
 } from "../lib/bindings.generated";
 import { notify, notifyError } from "../lib/actions";
 import { cn } from "../lib/cn";
+import { pickDirectory } from "../lib/dialog";
 import { escapeUnsafeText, relativeTime, shortSha } from "../lib/format";
 import { ipc } from "../lib/ipc";
 import { openDashboard } from "../lib/router";
@@ -264,12 +264,8 @@ export function RepoDetail({ id }: { id: string }) {
 
   async function locate() {
     try {
-      const selectedPath = await open({
-        directory: true,
-        multiple: false,
-        title: `Locate ${summary?.name ?? "repository"}`,
-      });
-      if (typeof selectedPath !== "string") return;
+      const selectedPath = await pickDirectory(`Locate ${summary?.name ?? "repository"}`);
+      if (!selectedPath) return;
       const next = await ipc.locateRepo(id, selectedPath);
       upsert(next);
       notify("success", "Repository relocated", next.path);
@@ -367,10 +363,7 @@ export function RepoDetail({ id }: { id: string }) {
 
       {summary.error && (
         <div className="mt-3">
-          <ErrorCard
-            error={summary.error}
-            onRetry={() => void refresh()}
-          />
+          <ErrorCard error={summary.error} onRetry={() => void refresh()} />
           {(summary.primaryStatus === "unavailable" || summary.primaryStatus === "error") && (
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="ghost" onClick={() => void locate()}>
@@ -591,7 +584,9 @@ function BranchesPanel({
       {branches.map((branch) => (
         <li key={branch.name} className="flex flex-wrap items-center gap-2 px-2 py-2">
           <GitBranch aria-hidden className="h-3.5 w-3.5 text-[var(--muted)]" />
-          <span className="mono text-[12px] text-[var(--text)]">{escapeUnsafeText(branch.name)}</span>
+          <span className="mono text-[12px] text-[var(--text)]">
+            {escapeUnsafeText(branch.name)}
+          </span>
           {branch.isHead && <Badge tone="info">HEAD</Badge>}
           {branch.upstream && (
             <span className="truncate text-[11px] text-[var(--muted)]">→ {branch.upstream}</span>

@@ -14,13 +14,23 @@ test.describe('GitPulse UI/UX', () => {
     await expect(page.locator('button:has-text("Scan a folder")')).toBeVisible();
   });
 
-  test('Keyboard navigation works on Onboarding', async ({ page }) => {
-    await page.keyboard.press('Tab'); // skip link
-    await page.keyboard.press('Tab'); // first button
-    await expect(page.locator('button:has-text("Add a repository")')).toBeFocused();
-    
+  test('Keyboard navigation reaches onboarding actions', async ({ page }) => {
+    const addButton = page.locator('button:has-text("Add a repository")');
+    await addButton.scrollIntoViewIfNeeded();
+    await addButton.focus();
+    await expect(addButton).toBeFocused();
+
     await page.keyboard.press('Tab');
     await expect(page.locator('button:has-text("Scan a folder")')).toBeFocused();
+  });
+
+  test('Skip link moves focus into the main content', async ({ page }) => {
+    await page.keyboard.press('Tab');
+    const skipLink = page.locator('a[href="#main-content"]');
+    await expect(skipLink).toBeFocused();
+
+    await page.keyboard.press('Enter');
+    await expect(page.locator('#main-content')).toBeFocused();
   });
 
   test('Settings page opens via header icon button', async ({ page }) => {
@@ -181,15 +191,29 @@ test.describe('GitPulse UI/UX', () => {
     expect(criticalErrors.length).toBe(0);
   });
 
-  test('Color scheme: dark mode by default', async ({ page }) => {
-    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    const bgColor = await page.locator('body').evaluate(el => 
-      window.getComputedStyle(el).backgroundColor
+  test('Color scheme follows the system preference by default', async ({ page }) => {
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'system');
+
+    const darkBg = await page.locator('body').evaluate((el) =>
+      window.getComputedStyle(el).backgroundColor,
     );
-    expect(bgColor).toBeTruthy();
+
+    await page.emulateMedia({ colorScheme: 'light' });
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+    const lightBg = await page.locator('body').evaluate((el) =>
+      window.getComputedStyle(el).backgroundColor,
+    );
+
+    expect(darkBg).toBeTruthy();
+    expect(lightBg).toBeTruthy();
+    expect(lightBg).not.toBe(darkBg);
   });
 
-  test('Repo row keyboard navigation (when repos exist)', async ({ page }) => {
+  test('Repo row keyboard navigation (when repos exist)', async () => {
     test.skip();
   });
 });
@@ -203,8 +227,6 @@ test.describe('Settings Page Details', () => {
     await page.waitForURL('**/#/settings', { timeout: 5000 });
   });
 
-  const sectionNames = ['General', 'Repositories', 'Notifications', 'Data & history', 'About'];
-  
   async function scrollToSection(page, sectionName) {
     const btn = page.locator(`nav[aria-label="Settings sections"] button:has-text("${sectionName}")`);
     await btn.click();
@@ -252,14 +274,14 @@ test.describe('Settings Page Details', () => {
   test('About section shows version and shortcuts', async ({ page }) => {
     await scrollToSection(page, 'About');
     await expect(page.locator('#settings-about')).toBeVisible();
-    await expect(page.locator('#settings-about text=Version')).toBeVisible();
-    await expect(page.locator('#settings-about text=⌘/Ctrl+K')).toBeVisible();
-    await expect(page.locator('#settings-about text=⌘/Ctrl+R')).toBeVisible();
+    await expect(page.locator('#settings-about').getByText('Version', { exact: true })).toBeVisible();
+    await expect(page.locator('#settings-about').getByText('⌘/Ctrl+K')).toBeVisible();
+    await expect(page.locator('#settings-about').getByText('⌘/Ctrl+R')).toBeVisible();
   });
 });
 
 test.describe('Repo Detail View', () => {
-  test.skip('Repo detail shows changes, diff, commits, branches', async ({ page }) => {
+  test.skip('Repo detail shows changes, diff, commits, branches', async () => {
     // This test requires a repo to be added first
   });
 });

@@ -48,6 +48,13 @@ export const useUi = create<UiState>((set, get) => ({
   scanOpen: false,
   setSearch: (value) => set({ search: value }),
   addToast: (toast) => {
+    // Collapse identical messages (for example React StrictMode mounting an
+    // effect twice) so users are not shown the same error in a stack.
+    const existing = get().toasts.find(
+      (item) =>
+        item.tone === toast.tone && item.title === toast.title && item.message === toast.message,
+    );
+    if (existing) return existing.id;
     toastCounter += 1;
     const id = `toast-${toastCounter}`;
     const next = { ...toast, id };

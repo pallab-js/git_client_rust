@@ -47,8 +47,31 @@ function toPatch(update: SettingsUpdate): SettingsPatch {
   };
 }
 
+const THEME_KEY = "gitpulse:theme";
+
 export function applyTheme(theme: Theme): void {
   document.documentElement.dataset.theme = theme;
+  try {
+    window.localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // Storage can be unavailable; the theme still applies for this session.
+  }
+}
+
+/**
+ * Applies the last known theme before the first paint so the UI does not flash
+ * the default dark palette when the saved preference is light.
+ */
+export function applyCachedTheme(): void {
+  if (typeof window === "undefined") return;
+  try {
+    const cached = window.localStorage.getItem(THEME_KEY);
+    if (cached === "light" || cached === "dark" || cached === "system") {
+      document.documentElement.dataset.theme = cached;
+    }
+  } catch {
+    // Ignore storage failures.
+  }
 }
 
 interface SettingsState {

@@ -12,7 +12,6 @@ import {
   Download,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
 
 import type { Settings as SettingsModel, Theme } from "../lib/bindings.generated";
 import {
@@ -26,11 +25,13 @@ import { cn } from "../lib/cn";
 import { escapeUnsafeText, relativeTime, shortenPath } from "../lib/format";
 import { ipc } from "../lib/ipc";
 import { openDashboard } from "../lib/router";
+import { pickDirectory } from "../lib/dialog";
 import { useRepos } from "../stores/repos";
 import { defaultNotifications, useSettings } from "../stores/settings";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { ConfirmDialog } from "../components/ui/ConfirmDialog";
+import { ErrorCard } from "../components/ui/ErrorCard";
 import { Spinner } from "../components/ui/EmptyState";
 import { Select, Input } from "../components/ui/Field";
 import { IconButton } from "../components/ui/IconButton";
@@ -47,6 +48,7 @@ const SECTIONS = [
 export function Settings() {
   const settings = useSettings((state) => state.settings);
   const loading = useSettings((state) => state.loading);
+  const error = useSettings((state) => state.error);
   const load = useSettings((state) => state.load);
   const updateSettings = useSettings((state) => state.update);
   const repos = useRepos((state) => state.repos);
@@ -73,9 +75,27 @@ export function Settings() {
   }
 
   if (!settings) {
+    if (loading) {
+      return (
+        <div className="flex h-full items-center justify-center gap-2" role="status">
+          <Spinner />
+          <p className="text-[13px] text-[var(--muted)]">Loading settings…</p>
+        </div>
+      );
+    }
+    if (error) {
+      return (
+        <div className="mx-auto max-w-xl p-6">
+          <ErrorCard
+            error={{ code: "UNKNOWN", message: error, details: null, retryable: true }}
+            onRetry={() => void load()}
+          />
+        </div>
+      );
+    }
     return (
       <div className="flex h-full items-center justify-center">
-        {loading ? <Spinner /> : <p className="text-[13px] text-[var(--muted)]">Settings unavailable.</p>}
+        <p className="text-[13px] text-[var(--muted)]">Settings unavailable.</p>
       </div>
     );
   }
@@ -104,8 +124,8 @@ export function Settings() {
 
   async function locateRepo(id: string) {
     try {
-      const selected = await open({ directory: true, multiple: false, title: "Locate repository" });
-      if (typeof selected !== "string") return;
+      const selected = await pickDirectory("Locate repository");
+      if (!selected) return;
       const summary = await ipc.locateRepo(id, selected);
       upsert(summary);
       notify("success", "Repository relocated");
@@ -166,7 +186,11 @@ export function Settings() {
         </nav>
 
         <div className="space-y-4">
-          <Section id="general" title="General" description="Appearance, startup, and background behavior.">
+          <Section
+            id="general"
+            title="General"
+            description="Appearance, startup, and background behavior."
+          >
             <div className="grid gap-3 sm:grid-cols-2">
               <Select
                 label="Theme"
@@ -181,7 +205,9 @@ export function Settings() {
                 label="Tray badge basis"
                 value={settings.trayBadgeBasis}
                 onChange={(event) =>
-                  void save({ trayBadgeBasis: event.target.value as SettingsModel["trayBadgeBasis"] })
+                  void save({
+                    trayBadgeBasis: event.target.value as SettingsModel["trayBadgeBasis"],
+                  })
                 }
                 hint="What the tray count represents."
               >
@@ -296,7 +322,10 @@ export function Settings() {
                           <Badge tone="danger">Unavailable</Badge>
                         )}
                       </div>
-                      <p className="mono truncate text-[11px] text-[var(--muted)]" title={repo.path}>
+                      <p
+                        className="mono truncate text-[11px] text-[var(--muted)]"
+                        title={repo.path}
+                      >
                         {shortenPath(repo.path, 64)}
                       </p>
                       <p className="text-[11px] text-[var(--muted)]">
@@ -451,8 +480,14 @@ export function Settings() {
             <dl className="grid gap-2 text-[12px] sm:grid-cols-2">
               <AboutRow label="Version" value="0.1.0" />
               <AboutRow label="Bundle ID" value="io.github.pallabpc.gitpulse" />
-              <AboutRow label="Local-first" value="No network requests, no telemetry, no account." />
-              <AboutRow label="Read-only" value="Never stages, commits, fetches, pulls, or pushes." />
+              <AboutRow
+                label="Local-first"
+                value="No network requests, no telemetry, no account."
+              />
+              <AboutRow
+                label="Read-only"
+                value="Never stages, commits, fetches, pulls, or pushes."
+              />
             </dl>
             <div className="rounded-[8px] border border-[var(--border)] p-3 text-[12px] text-[var(--muted)]">
               <p className="font-medium text-[var(--text)]">Keyboard shortcuts</p>
@@ -555,7 +590,11 @@ function NumberField({
     const parsed = Number.parseInt(draft, 10);
     if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
       setDraft(String(value));
-      notify("warning", "That value is out of range", `${label} must be between ${min} and ${max}.`);
+      notify(
+        "warning",
+        "That value is out of range",
+        `${label} must be between ${min} and ${max}.`,
+      );
       return;
     }
     if (parsed !== value) onCommit(parsed);

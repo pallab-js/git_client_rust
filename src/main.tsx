@@ -3,7 +3,10 @@ import { createRoot } from "react-dom/client";
 
 import { App } from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { applyCachedTheme } from "./stores/settings";
 import "./styles/app.css";
+
+applyCachedTheme();
 
 function showBootError(error: unknown) {
   const root = document.getElementById("root");

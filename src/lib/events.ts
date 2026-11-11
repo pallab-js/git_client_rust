@@ -7,6 +7,8 @@ import type {
   ScanProgress,
   TrayStats,
 } from "./bindings.generated";
+import { mockListen } from "./mock-backend";
+import { isTauriRuntime } from "./tauri-env";
 
 export interface AppEventHandlers {
   onRepoUpdated?: (summary: RepoSummary) => void;
@@ -21,48 +23,47 @@ export interface AppEventHandlers {
 export async function subscribeAppEvents(handlers: AppEventHandlers): Promise<UnlistenFn[]> {
   const unlisten: UnlistenFn[] = [];
 
+  // Register listeners independently so one failing channel (for example a
+  // temporary IPC hiccup) does not tear down every other subscription.
+  async function add<T>(
+    name: string,
+    handler: (event: { event: string; id: number; payload: T }) => void,
+  ): Promise<void> {
+    try {
+      const stop = isTauriRuntime() ? await listen<T>(name, handler) : mockListen<T>(name, handler);
+      unlisten.push(stop);
+    } catch (error) {
+      console.warn(`GitPulse could not listen for "${name}"`, error);
+    }
+  }
+
   if (handlers.onRepoUpdated) {
-    unlisten.push(
-      await listen<RepoSummary>("repo:updated", (event) => handlers.onRepoUpdated?.(event.payload)),
-    );
+    const handler = handlers.onRepoUpdated;
+    await add<RepoSummary>("repo:updated", (event) => handler(event.payload));
   }
   if (handlers.onRepoRemoved) {
-    unlisten.push(
-      await listen<{ id: string }>("repo:removed", (event) =>
-        handlers.onRepoRemoved?.(event.payload.id),
-      ),
-    );
+    const handler = handlers.onRepoRemoved;
+    await add<{ id: string }>("repo:removed", (event) => handler(event.payload.id));
   }
   if (handlers.onRepoSelect) {
-    unlisten.push(
-      await listen<{ id: string }>("repo:select", (event) =>
-        handlers.onRepoSelect?.(event.payload.id),
-      ),
-    );
+    const handler = handlers.onRepoSelect;
+    await add<{ id: string }>("repo:select", (event) => handler(event.payload.id));
   }
   if (handlers.onScanProgress) {
-    unlisten.push(
-      await listen<ScanProgress>("scan:progress", (event) =>
-        handlers.onScanProgress?.(event.payload),
-      ),
-    );
+    const handler = handlers.onScanProgress;
+    await add<ScanProgress>("scan:progress", (event) => handler(event.payload));
   }
   if (handlers.onScanCompleted) {
-    unlisten.push(
-      await listen<ScanCompleted>("scan:completed", (event) =>
-        handlers.onScanCompleted?.(event.payload),
-      ),
-    );
+    const handler = handlers.onScanCompleted;
+    await add<ScanCompleted>("scan:completed", (event) => handler(event.payload));
   }
   if (handlers.onAppError) {
-    unlisten.push(
-      await listen<AppError>("app:error", (event) => handlers.onAppError?.(event.payload)),
-    );
+    const handler = handlers.onAppError;
+    await add<AppError>("app:error", (event) => handler(event.payload));
   }
   if (handlers.onTrayStats) {
-    unlisten.push(
-      await listen<TrayStats>("tray:stats", (event) => handlers.onTrayStats?.(event.payload)),
-    );
+    const handler = handlers.onTrayStats;
+    await add<TrayStats>("tray:stats", (event) => handler(event.payload));
   }
 
   return unlisten;

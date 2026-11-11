@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { cn } from "../../lib/cn";
 
 interface ToggleProps {
@@ -9,15 +11,17 @@ interface ToggleProps {
 }
 
 export function Toggle({ checked, onChange, label, description, disabled }: ToggleProps) {
+  const id = useId();
   return (
     <div className="flex items-start justify-between gap-4 py-2">
-      <span className="min-w-0">
+      <label htmlFor={id} className="min-w-0 cursor-pointer">
         <span className="block text-[13px] text-[var(--text)]">{label}</span>
         {description && (
           <span className="mt-0.5 block text-[12px] text-[var(--muted)]">{description}</span>
         )}
-      </span>
+      </label>
       <button
+        id={id}
         type="button"
         role="switch"
         aria-checked={checked}

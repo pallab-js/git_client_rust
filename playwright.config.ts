@@ -19,7 +19,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm tauri dev',
+    // The UI tests drive Chromium against the Vite dev server. When Tauri IPC
+    // is unavailable the app uses its built-in browser fallback backend.
+    command: 'pnpm dev',
     url: 'http://localhost:1420',
     reuseExistingServer: !process.env.CI,
     timeout: 120000,

@@ -16,6 +16,12 @@ export function AppShell({ children, selectedId, showSidebar = true }: AppShellP
     <div className="flex h-full flex-col bg-[var(--bg)]">
       <a
         href="#main-content"
+        onClick={(event) => {
+          event.preventDefault();
+          const main = document.getElementById("main-content");
+          main?.scrollIntoView({ block: "start" });
+          main?.focus();
+        }}
         className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-[var(--surface)] focus:px-3 focus:py-1.5"
       >
         Skip to content
@@ -23,7 +29,11 @@ export function AppShell({ children, selectedId, showSidebar = true }: AppShellP
       <Header showSidebar={showSidebar} />
       <div className="flex min-h-0 flex-1">
         {showSidebar && <Sidebar selectedId={selectedId} />}
-        <main id="main-content" className="min-w-0 flex-1 overflow-y-auto">
+        <main
+          id="main-content"
+          tabIndex={-1}
+          className="min-w-0 flex-1 overflow-y-auto focus:outline-none"
+        >
           {children}
         </main>
       </div>

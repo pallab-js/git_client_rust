@@ -1,7 +1,6 @@
-import { open, save } from "@tauri-apps/plugin-dialog";
-
 import { useRepos } from "../stores/repos";
 import { useUi, type ToastTone } from "../stores/ui";
+import { pickDirectory, pickSavePath } from "./dialog";
 import { ipc, toAppError } from "./ipc";
 import { openRepo } from "./router";
 
@@ -16,12 +15,8 @@ export function notifyError(error: unknown, title = "Something went wrong"): voi
 
 export async function pickAndAddRepo(): Promise<void> {
   try {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: "Add a Git repository",
-    });
-    if (typeof selected !== "string") return;
+    const selected = await pickDirectory("Add a Git repository");
+    if (!selected) return;
     const summary = await ipc.addRepo(selected);
     useRepos.getState().upsert(summary);
     useRepos.getState().select(summary.id);
@@ -34,12 +29,8 @@ export async function pickAndAddRepo(): Promise<void> {
 
 export async function pickAndScan(): Promise<void> {
   try {
-    const selected = await open({
-      directory: true,
-      multiple: false,
-      title: "Scan a folder for Git repositories",
-    });
-    if (typeof selected !== "string") return;
+    const selected = await pickDirectory("Scan a folder for Git repositories");
+    if (!selected) return;
     const handle = await ipc.scanFolder(selected, 3);
     useUi.getState().setScanProgress({
       scanId: handle.scanId,
@@ -111,12 +102,12 @@ export async function openMainRoute(path: string): Promise<void> {
 
 export async function exportDiagnosticsAction(): Promise<void> {
   try {
-    const selected = await save({
+    const selected = await pickSavePath({
       title: "Save GitPulse diagnostics",
       defaultPath: "gitpulse-diagnostics.json",
       filters: [{ name: "JSON", extensions: ["json"] }],
     });
-    if (typeof selected !== "string") return;
+    if (!selected) return;
     const result = await ipc.exportDiagnostics(selected);
     notify("success", "Diagnostics saved", result.path);
   } catch (error) {

@@ -1,10 +1,10 @@
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { notifyError } from "./lib/actions";
 import { subscribeAppEvents, unsubscribeAll } from "./lib/events";
 import { ipc } from "./lib/ipc";
-import { navigate, parseRoute, type Route } from "./lib/router";
+import { navigate, parseRoute, routeKey, type Route } from "./lib/router";
 import { detectSurface } from "./lib/surface";
 import { useRepos } from "./stores/repos";
 import { useSettings } from "./stores/settings";
@@ -153,6 +153,17 @@ function MainApp() {
     }
   }, [route]);
 
+  const activeRoute = routeKey(route);
+  const lastRoute = useRef(activeRoute);
+
+  useEffect(() => {
+    if (lastRoute.current === activeRoute) return;
+    lastRoute.current = activeRoute;
+    // Move focus into the new view so keyboard and screen-reader users do not
+    // stay anchored on the header after an in-app navigation.
+    document.getElementById("main-content")?.focus();
+  }, [activeRoute]);
+
   let content;
   switch (route.name) {
     case "repo":
@@ -168,8 +179,12 @@ function MainApp() {
       content = <Dashboard />;
   }
 
+  // Hide the sidebar only on the full-screen settings page; the dashboard and
+  // repo views keep it so search and repository switching stay available.
+  const showSidebar = route.name !== "settings";
+
   return (
-    <AppShell selectedId={selectedId} showSidebar={route.name !== "settings"}>
+    <AppShell selectedId={selectedId} showSidebar={showSidebar}>
       {content}
     </AppShell>
   );
